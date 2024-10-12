@@ -216,6 +216,126 @@ scrape_nfl = function(pos = c("QB", "RB", "WR", "TE", "K", "DST"), season = NULL
   l_pos
 }
 
+
+scrape_nfl_actual = function(pos = c("QB", "RB", "WR", "TE", "K", "DST"), season = NULL, week = NULL,
+                      draft = TRUE, weekly = TRUE) {
+  message("\nThe NFL.com scrape uses a 2 second delay between pages")
+
+  if(is.null(season)) {
+    season = get_scrape_year()
+  }
+  if(is.null(week)) {
+    week = get_scrape_week()
+  }
+
+  pos_scrape = nfl_pos_idx[pos]
+
+  base_link = paste0("https://fantasy.nfl.com/research/projections?position=", pos_scrape[1],
+                     "&sort=pts&statCategory=stats&statSeason=", season,
+                     "&statType=seasonStats")
+
+  site_session = session(base_link)
+
+  l_pos = lapply(pos, function(pos) {
+    pos_scrape = nfl_pos_idx[pos]
+
+    n_records = case_when(
+      pos == "QB" ~ 42,
+      pos == "RB" ~ 100,
+      pos == "WR" ~ 150,
+      pos == "TE" ~ 60,
+      pos == "K" ~ 64,
+      pos == "DST" ~ 32
+    )
+
+    if(week == 0) {
+      scrape_link = paste0("https://fantasy.nfl.com/research/projections?position=", pos_scrape,
+                           "&count=", n_records,
+                           "&sort=pts&statCategory=stats&statSeason=", season,
+                           "&statType=seasonStats")
+    } else {
+      scrape_link = paste0("https://fantasy.nfl.com/research/projections?position=", pos_scrape[1],
+                           "&count=", n_records,
+                           "&sort=pts&statCategory=stats&statSeason=", season,
+                           "&statType=weekStats&statWeek=", week)
+    }
+
+    cat(paste0("Scraping ", pos, " projections from"), scrape_link, sep = "\n  ")
+
+    html_page = site_session %>%
+      session_jump_to(scrape_link) %>%
+      read_html()
+
+    # Get PID
+    site_id = html_page %>%
+      html_elements("table td:first-child a.playerName") %>%
+      html_attr("href") %>%
+      sub(".*=", "",  .)
+
+    # Getting column names
+    col_names = html_page %>%
+      html_element("table > thead") %>%
+      html_table(header = FALSE)
+
+    col_names = trimws(paste(col_names[1, ], col_names[2, ]))
+    col_names = nfl_columns[col_names]
+
+    # Creating and cleaning table
+    out_df = html_page %>%
+      html_element("table > tbody") %>%
+      html_table(header = FALSE) %>%
+      `names<-`(col_names)
+
+    # Breaking out first column / cleaning (for DST)
+    if(pos != "DST") {
+      out_df = out_df %>%
+        extract(player, c("player", "pos", "team"),
+                "(.*?)\\s+\\b(QB|RB|WR|TE|K)\\b.*?([A-Z]{2,3})")
+    } else {
+      out_df$team = sub("\\s+DEF$", "", out_df$team)
+      out_df$pos = "DST"
+    }
+
+    if(pos %in% c("RB", "WR", "TE") && "pass_int" %in% names(out_df)) {
+      out_df$pass_int = NULL
+    }
+
+    # Misc column cleanup before done
+    out_df$data_src = "NFL"
+    out_df$nfl_id = as.character(site_id)
+    out_df$opp = NULL
+
+    # Type cleanup
+    out_df[out_df == "-"] = NA
+    idx = names(out_df) %in% c("id", "nfl_id")
+    out_df[!idx] = type.convert(out_df[!idx], as.is = TRUE)
+
+    # Combining df's, removing NA's, filtering out rows with
+    out_df = out_df[out_df$site_pts > 0 & !is.na(out_df$site_pts), ]
+    # Adding IDs
+    out_df$id = get_mfl_id(
+      out_df$nfl_id,
+      player_name = if(pos == "DST") NULL else out_df$player,
+      pos = out_df$pos,
+      team = out_df$team
+    )
+    out_df = out_df %>%
+      dplyr::select(id, src_id = nfl_id, any_of("player"), pos, team, dplyr::everything())
+
+
+    Sys.sleep(2L) # temporary, until I get an argument for honoring the crawl delay
+
+    # Removing all NA columns
+    Filter(function(x) any(!is.na(x)), out_df)
+
+  })
+
+  names(l_pos) = pos
+  attr(l_pos, "season") = season
+  attr(l_pos, "week") = week
+  l_pos
+}
+
 # Fantasysharks ----
 scrape_fantasysharks <- function(pos = c("QB", "RB", "WR", "TE", "K", "DST", "DL", "LB", "DB"),
                                  season = NULL, week = NULL, draft = TRUE, weekly = TRUE) {
