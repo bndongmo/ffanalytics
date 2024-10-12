@@ -31,7 +31,7 @@ scrape_data <- function(
 
   src = match.arg(src, several.ok = TRUE,
                   c("CBS", "ESPN", "FantasyData", "FantasyPros", "FantasySharks", "FFToday",
-                    "FleaFlicker", "NumberFire", "FantasyFootballNerd", "NFL",
+                    "FleaFlicker", "NumberFire", "FantasyFootballNerd", "NFL", "NFL_Actual",
                     "RTSports","Walterfootball"))
   pos = match.arg(pos, several.ok = TRUE,
                   c("QB", "RB", "WR", "TE", "K", "DST", "DL", "LB", "DB"))
