@@ -17,7 +17,7 @@
 #' @export
 scrape_data <- function(
   src = c("CBS", "ESPN", "FantasyPros", "FantasySharks", "FFToday",
-          "FleaFlicker", "NumberFire", "FantasyFootballNerd", "NFL",
+          "FleaFlicker", "NumberFire", "FantasyFootballNerd", "NFL", "NFL_Actual",
           "RTSports", "Walterfootball"),
   pos = c("QB", "RB", "WR", "TE", "K", "DST", "DL", "LB", "DB"),
   season = NULL, week = NULL, ...){
